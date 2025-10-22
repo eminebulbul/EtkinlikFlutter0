@@ -1,7 +1,9 @@
-// main.dart'ın YENİ ve TEMİZ hali
-import 'package:flutter/material.dart';
-import 'screens/home_screen.dart'; // 1. Değişiklik: Yeni ekranımızı tanıttık
+// main.dart'ın GÜNCELLENMİŞ hali
 
+import 'package:etkinlik/screens/home_screen.dart';
+
+import 'package:flutter/material.dart';
+// 1. Değişiklik: Artık LoginScreen'i import ediyoruz
 void main() {
   runApp(const MyApp());
 }
@@ -12,14 +14,17 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Etkinlik Arkadaşı', 
+      title: 'MateVent', // Proje adına güncelledim
       theme: ThemeData(
         primarySwatch: Colors.red,
       ),
-      home: const HomeScreen(), // 2. Değişiklik: Artık bizim ekranımızı gösteriyor
+      // 2. Değişiklik: Artık doğrudan HomeScreen'i değil, LoginScreen'i gösteriyoruz.
+    
+      // HomeScreen'e, yoksa LoginScreen'e yönlendirme yapacağız.
+
+      home: const HomeScreen(), 
+
       debugShowCheckedModeBanner: false,
     );
   }
 }
-
-// ARTIK ALTINDA BAŞKA KOD YOK, TERTEMİZ!

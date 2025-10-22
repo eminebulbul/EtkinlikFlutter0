@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../models/event_model.dart';
 import '../services/api_service.dart';
 import '../widgets/event_card.dart';
+import 'login_screen.dart'; // 1. YENİ İMPORT: Çıkış yapınca yönlendirmek için
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,11 +15,25 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late Future<List<EventModel>> futureEvents;
-  
+  final ApiService _apiService = ApiService(); // 2. ApiService nesnesi
+
   @override
   void initState() {
     super.initState();
-    futureEvents = ApiService().fetchEvents();
+    // 3. _apiService üzerinden çağır
+    futureEvents = _apiService.fetchEvents();
+  }
+
+  // 4. YENİ FONKSİYON: Çıkış Yap
+  void _logout() async {
+    await _apiService.logout(); // Token'ı sil
+    
+    if (mounted) {
+      // LoginScreen'e geri dön ve Ana Sayfa'yı yığından kaldır
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+      );
+    }
   }
 
   int _selectedIndex = 0;
@@ -40,8 +55,14 @@ class _HomeScreenState extends State<HomeScreen> {
             Text('Ankara, Çankaya'),
           ],
         ),
-        actions: const [
-          Padding(
+        actions: [ // 'actions' listesini güncelledim
+          // 5. YENİ BUTON: Çıkış Yap Butonu
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: _logout,
+            tooltip: 'Çıkış Yap',
+          ),
+          const Padding(
             padding: EdgeInsets.only(right: 16.0),
             child: CircleAvatar(
               backgroundImage: NetworkImage('https://i.pravatar.cc/150?img=12'),
@@ -58,6 +79,7 @@ class _HomeScreenState extends State<HomeScreen> {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
+            // ... (Hata yönetimi aynı) ...
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -65,6 +87,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             );
           } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+            // ... (ListView aynı) ...
             final events = snapshot.data!;
             return ListView.builder(
               padding: const EdgeInsets.all(16.0),
@@ -79,6 +102,7 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       ),
       bottomNavigationBar: BottomNavigationBar(
+        // ... (BottomNavigationBar aynı) ...
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline), label: 'Mesajlar'),
           BottomNavigationBarItem(icon: Icon(Icons.favorite_border), label: 'Favoriler'),
