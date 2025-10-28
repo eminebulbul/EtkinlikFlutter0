@@ -7,8 +7,9 @@ import 'package:http/http.dart' as http;
 import '../models/event_model.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+const String baseUrl = "http://localhost:5221/api";
 class ApiService {
-  final String _baseUrl = "http://10.0.2.2:5221/api"; 
+  final String _baseUrl = baseUrl; 
   final _storage = const FlutterSecureStorage();
 
   Future<String?> _getToken() async {
