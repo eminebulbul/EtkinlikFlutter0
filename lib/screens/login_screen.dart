@@ -1,8 +1,8 @@
-// lib/screens/login_screen.dart
 import 'package:flutter/material.dart';
-import '../services/api_service.dart'; // 1. Bağlantı
-import 'home_screen.dart'; // 2. Bağlantı
-import 'register_screen.dart'; // 3. Bağlantı
+import 'package:shared_preferences/shared_preferences.dart';
+import '../services/api_service.dart';
+import '../screens/home_screen.dart';
+import '../screens/register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -12,124 +12,112 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
+  final _apiService = ApiService();
+
   bool _isLoading = false;
-  final ApiService _apiService = ApiService();
 
-  void _login() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() {
-        _isLoading = true;
-      });
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    _passCtrl.dispose();
+    super.dispose();
+  }
 
-      // Gerçek API çağrısı
-      bool loginSucceeded = await _apiService.login(
-        _emailController.text,
-        _passwordController.text,
+  Future<void> _handleLogin() async {
+    final email = _emailCtrl.text.trim();
+    final password = _passCtrl.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Lütfen tüm alanları doldurun.")),
       );
+      return;
+    }
 
-      setState(() {
-        _isLoading = false;
-      });
+    setState(() => _isLoading = true);
 
-      if (loginSucceeded && mounted) {
-        // Giriş başarılıysa HomeScreen'e yönlendir ve geri dönülemesin
-        Navigator.of(context).pushReplacement(
+    try {
+      final success = await _apiService.login(email, password);
+
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Giriş başarılı!")),
+        );
+
+        await Future.delayed(const Duration(seconds: 1));
+
+        Navigator.pushReplacement(
+          context,
           MaterialPageRoute(builder: (context) => const HomeScreen()),
         );
-      } else if (mounted) {
-        // Hata mesajı göster
+      } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Giriş başarısız. Bilgilerinizi kontrol edin.')),
+          const SnackBar(content: Text("E-posta veya şifre hatalı.")),
         );
       }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Bir hata oluştu: $e")),
+      );
     }
   }
 
-  void _navigateToRegister() {
-    // Kayıt ekranına yönlendir
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => const RegisterScreen()),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(32.0),
-          child: Form(
-            key: _formKey,
+      body: SafeArea(
+        minimum: const EdgeInsets.all(24),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  'MateVent', // Proje Adı
-                  style: TextStyle(
-                    fontSize: 48,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.red.shade700,
-                  ),
-                ),
-                const SizedBox(height: 40),
-                TextFormField(
-                  controller: _emailController,
+                Text("Giriş Yap", style: Theme.of(context).textTheme.headlineMedium),
+                const SizedBox(height: 24),
+                TextField(
+                  controller: _emailCtrl,
                   decoration: const InputDecoration(
-                    labelText: 'E-posta',
+                    labelText: "E-posta",
                     border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.email),
                   ),
                   keyboardType: TextInputType.emailAddress,
-                  validator: (value) {
-                    if (value == null || value.isEmpty || !value.contains('@')) {
-                      return 'Lütfen geçerli bir e-posta girin.';
-                    }
-                    return null;
-                  },
                 ),
-                const SizedBox(height: 20),
-                TextFormField(
-                  controller: _passwordController,
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _passCtrl,
                   decoration: const InputDecoration(
-                    labelText: 'Şifre',
+                    labelText: "Şifre",
                     border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.lock),
                   ),
                   obscureText: true,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Lütfen şifrenizi girin.';
-                    }
-                    return null;
-                  },
                 ),
-                const SizedBox(height: 30),
-                _isLoading
-                    ? const CircularProgressIndicator()
-                    : SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _login,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: const Text(
-                            'Giriş Yap',
-                            style: TextStyle(fontSize: 18, color: Colors.white),
-                          ),
-                        ),
-                      ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _handleLogin,
+                    child: _isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text("Giriş Yap"),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 TextButton(
-                  onPressed: _navigateToRegister,
-                  child: const Text('Hesabın yok mu? Kayıt Ol'),
+                  onPressed: () {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (context) => const RegisterScreen()),
+                    );
+                  },
+                  child: const Text("Hesabım yok, kayıt ol"),
                 ),
               ],
             ),

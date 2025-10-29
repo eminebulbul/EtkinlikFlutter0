@@ -1,7 +1,6 @@
-// lib/screens/register_screen.dart
 import 'package:flutter/material.dart';
-import '../services/api_service.dart'; // 1. Yeni import: ApiService'i bağladık
-
+import '../services/api_service.dart'; // dosya yolunu kendi projenle eşleştir
+import '../screens/login_screen.dart';
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
@@ -10,129 +9,122 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final TextEditingController _usernameController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  bool _isLoading = false;
+  final _usernameCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
+  final _apiService = ApiService();
 
-  // 2. ApiService'ten bir nesne oluşturduk
-  final ApiService _apiService = ApiService();
+  @override
+  void dispose() {
+    _usernameCtrl.dispose();
+    _emailCtrl.dispose();
+    _passCtrl.dispose();
+    super.dispose();
+  }
 
-  void _register() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() {
-        _isLoading = true;
-      });
+  Future<void> _handleRegister() async {
+    final name = _usernameCtrl.text.trim();
+    final email = _emailCtrl.text.trim();
+    final password = _passCtrl.text.trim();
 
-      // 3. Değişiklik: Sahte bekleme yerine gerçek API çağrısı
-      bool registerSucceeded = await _apiService.register(
-        _usernameController.text,
-        _emailController.text,
-        _passwordController.text,
+    if (name.isEmpty || email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Lütfen tüm alanları doldurun.")),
       );
-      // ---------------
+      return;
+    }
 
-      setState(() {
-        _isLoading = false;
-      });
+    try {
+      final success = await _apiService.register(name, email, password);
 
-      if (registerSucceeded && mounted) {
+      if (!mounted) return;
+
+      if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Kayıt başarılı!")),
+      );
+
+      // SnackBar’ın görünmesi için 1 saniye bekletelim
+      await Future.delayed(const Duration(seconds: 1));
+
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+      );
+      }
+
+        
+
+      else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Kayıt başarılı! Şimdi giriş yapabilirsiniz.')),
-        );
-        Navigator.of(context).pop(); // Login ekranına geri dön
-      } else if (mounted) { // 4. İyileştirme: Hata durumunda da mounted kontrolü
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Kayıt başarısız. Bilgiler (örn: e-posta) zaten kullanılıyor olabilir.')),
+          const SnackBar(content: Text("Kayıt başarısız!")),
         );
       }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Bir hata oluştu: $e")),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Kalan UI kodu (build metodu) aynı kalabilir...
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Kayıt Ol'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-      ),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(32.0),
-          child: Form(
-            key: _formKey,
+      body: SafeArea(
+        minimum: const EdgeInsets.all(24),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                TextFormField(
-                  controller: _usernameController,
+                Text("Kayıt Ol", style: Theme.of(context).textTheme.headlineMedium),
+                const SizedBox(height: 24),
+                TextField(
+                  controller: _usernameCtrl,
                   decoration: const InputDecoration(
-                    labelText: 'Kullanıcı Adı',
+                    labelText: "Kullanıcı adı",
                     border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.person),
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Lütfen bir kullanıcı adı girin.';
-                    }
-                    return null;
-                  },
                 ),
-                const SizedBox(height: 20),
-                TextFormField(
-                  controller: _emailController,
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _emailCtrl,
                   decoration: const InputDecoration(
-                    labelText: 'E-posta',
+                    labelText: "E-posta",
                     border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.email),
                   ),
                   keyboardType: TextInputType.emailAddress,
-                  validator: (value) {
-                    if (value == null || value.isEmpty || !value.contains('@')) {
-                      return 'Lütfen geçerli bir e-posta girin.';
-                    }
-                    return null;
-                  },
                 ),
-                const SizedBox(height: 20),
-                TextFormField(
-                  controller: _passwordController,
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _passCtrl,
                   decoration: const InputDecoration(
-                    labelText: 'Şifre',
+                    labelText: "Şifre",
                     border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.lock),
                   ),
                   obscureText: true,
-                  validator: (value) {
-                    if (value == null || value.isEmpty || value.length < 6) {
-                      return 'Şifre en az 6 karakter olmalıdır.';
-                    }
-                    return null;
-                  },
                 ),
-                const SizedBox(height: 30),
-                _isLoading
-                    ? const CircularProgressIndicator()
-                    : SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _register,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: const Text(
-                            'Kayıt Ol',
-                            style: TextStyle(fontSize: 18, color: Colors.white),
-                          ),
-                        ),
-                      ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _handleRegister,
+                    child: const Text("Hesap Oluştur"),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (context) => const LoginScreen()),
+                    );
+                  },
+                  child: const Text("Zaten hesabım var, girişe dön"),
+                ),
+
               ],
             ),
           ),

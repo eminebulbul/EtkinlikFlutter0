@@ -1,89 +1,115 @@
-// lib/widgets/event_card.dart
-
 import 'package:flutter/material.dart';
 import '../models/event_model.dart';
 
 class EventCard extends StatelessWidget {
   final EventModel event;
-
   const EventCard({super.key, required this.event});
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.symmetric(vertical: 10.0),
+      margin: const EdgeInsets.only(bottom: 16),
+      clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(15.0),
+        borderRadius: BorderRadius.circular(16),
       ),
-      elevation: 5,
+      elevation: 3,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ClipRRect(
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(15.0),
-              topRight: Radius.circular(15.0),
-            ),
+          // üstte etkinlik resmi
+          AspectRatio(
+            aspectRatio: 16 / 9,
             child: Image.network(
               event.imageUrl,
-              height: 150,
-              width: double.infinity,
               fit: BoxFit.cover,
-              // Resim yüklenirken hata olursa diye bir yedek mekanizma ekleyelim
-              errorBuilder: (context, error, stackTrace) {
-                return const SizedBox(
-                  height: 150,
-                  child: Center(child: Icon(Icons.broken_image, color: Colors.grey)),
+              errorBuilder: (context, error, stack) {
+                return Container(
+                  color: Colors.grey.shade300,
+                  child: const Center(
+                    child: Icon(Icons.image_not_supported),
+                  ),
                 );
               },
             ),
           ),
+
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // başlık
                 Text(
                   event.title,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
+
+                // kaç kişi aranıyor + tarih
                 Row(
                   children: [
-                    const Text(
-                      'Aranan Kişi Sayısı:',
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                    const SizedBox(width: 8),
+                    Icon(Icons.group, size: 18, color: Colors.grey.shade700),
+                    const SizedBox(width: 6),
                     Text(
-                      event.peopleNeeded,
-                      style: const TextStyle(
-                          color: Colors.red,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16),
+                      "${event.peopleNeeded} kişi aranıyor",
+                      style: TextStyle(color: Colors.grey.shade700),
                     ),
-                    const Spacer(),
-                    CircleAvatar(
-                      radius: 12,
-                      backgroundImage: NetworkImage(event.hostImageUrl),
+                    const SizedBox(width: 12),
+                    Icon(Icons.calendar_month,
+                        size: 18, color: Colors.grey.shade700),
+                    const SizedBox(width: 6),
+                    Text(
+                      _formatDate(event.date),
+                      style: TextStyle(color: Colors.grey.shade700),
                     ),
-                    const SizedBox(width: 8),
-                    Text(event.hostName),
                   ],
                 ),
-                const SizedBox(height: 15),
+                const SizedBox(height: 12),
+
+                // konum
                 Row(
                   children: [
-                    const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
-                    const SizedBox(width: 8),
-                    Text(event.date),
-                    const Spacer(),
-                    const Icon(Icons.location_on, size: 16, color: Colors.grey),
-                    const SizedBox(width: 8),
-                    Text(event.location),
+                    Icon(Icons.place, size: 18, color: Colors.grey.shade700),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        event.location,
+                        style: TextStyle(color: Colors.grey.shade700),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // ev sahibi bilgisi
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundImage: NetworkImage(event.hostImageUrl),
+                      onBackgroundImageError: (_, _) {},
+                      child: event.hostImageUrl.isEmpty
+                          ? const Icon(Icons.person)
+                          : null,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        event.hostName,
+                        style: const TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        // ileride katıl butonu, DM gönder vb.
+                      },
+                      child: const Text("Katıl"),
+                    ),
                   ],
                 ),
               ],
@@ -92,5 +118,31 @@ class EventCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _formatDate(DateTime d) {
+    // örnek: 30 Ekim 18:30
+    final twoDigits = (int n) => n < 10 ? "0$n" : "$n";
+    final hour = twoDigits(d.hour);
+    final min = twoDigits(d.minute);
+
+    // türkçe ay ismi basit
+    const aylar = [
+      "Ocak",
+      "Şubat",
+      "Mart",
+      "Nisan",
+      "Mayıs",
+      "Haziran",
+      "Temmuz",
+      "Ağustos",
+      "Eylül",
+      "Ekim",
+      "Kasım",
+      "Aralık"
+    ];
+
+    final ay = aylar[d.month - 1];
+    return "${d.day} $ay $hour:$min";
   }
 }

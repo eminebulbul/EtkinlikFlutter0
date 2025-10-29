@@ -1,10 +1,9 @@
-// lib/screens/home_screen.dart
-
 import 'package:flutter/material.dart';
-import '../models/event_model.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
+import '../models/event_model.dart';
 import '../widgets/event_card.dart';
-import 'login_screen.dart'; // 1. YENİ İMPORT: Çıkış yapınca yönlendirmek için
+import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,108 +13,154 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  late Future<List<EventModel>> futureEvents;
-  final ApiService _apiService = ApiService(); // 2. ApiService nesnesi
+  final ApiService _api = ApiService();
+  late Future<List<EventModel>> _futureEvents;
+  String? _token;
+  int _selectedIndex = 2;
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
-    // 3. _apiService üzerinden çağır
-    futureEvents = _apiService.fetchEvents();
+    _futureEvents = _api.getEvents();
+    _loadToken();
   }
 
-  // 4. YENİ FONKSİYON: Çıkış Yap
-  void _logout() async {
-    await _apiService.logout(); // Token'ı sil
-    
-    if (mounted) {
-      // LoginScreen'e geri dön ve Ana Sayfa'yı yığından kaldır
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
-      );
-    }
-  }
-
-  int _selectedIndex = 0;
-
-  void _onItemTapped(int index) {
+  Future<void> _loadToken() async {
+    final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _selectedIndex = index;
+      _token = prefs.getString('auth_token');
     });
+  }
+
+  Future<void> _logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_token');
+
+    if (!mounted) return;
+    Navigator.pushReplacementNamed(context, '/login');
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Row(
+        title: const Text("Etkinlikler"),
+        actions: [
+          IconButton(
+            onPressed: _logout,
+            icon: const Icon(Icons.logout),
+            tooltip: "Çıkış yap",
+          ),
+        ],
+      ),
+      body: SafeArea(
+        minimum: const EdgeInsets.all(12),
+        child: Column(
           children: [
-            Icon(Icons.location_on, color: Colors.red),
-            SizedBox(width: 8),
-            Text('Ankara, Çankaya'),
+            // 🔍 Arama ve Filtre Barı
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      decoration: InputDecoration(
+                        hintText: "Etkinlik ara...",
+                        prefixIcon: const Icon(Icons.search),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[200],
+                      ),
+                      onChanged: (value) {
+                        setState(() {
+                          _searchQuery = value.toLowerCase();
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: () {
+                      // İleriye dönük filtreleme sayfası
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Filtre özelliği yakında :)")),
+                      );
+                    },
+                    icon: const Icon(Icons.filter_list),
+                  ),
+                ],
+              ),
+            ),
+
+            // 🧩 Etkinlik listesi
+            Expanded(
+              child: FutureBuilder<List<EventModel>>(
+                future: _futureEvents,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text("Hata: ${snapshot.error}"),
+                    );
+                  }
+
+                  final events = snapshot.data ?? [];
+                  final filtered = events
+                      .where((e) =>
+                          e.title.toLowerCase().contains(_searchQuery) ||
+                          e.location.toLowerCase().contains(_searchQuery))
+                      .toList();
+
+                  if (filtered.isEmpty) {
+                    return const Center(child: Text("Hiç etkinlik bulunamadı 😢"));
+                  }
+
+                  return GridView.builder(
+                    padding: const EdgeInsets.only(top: 8),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      childAspectRatio: 0.75,
+                    ),
+                    itemCount: filtered.length,
+                    itemBuilder: (context, index) {
+                      return EventCard(event: filtered[index]);
+                    },
+                  );
+                },
+              ),
+            ),
           ],
         ),
-        actions: [ // 'actions' listesini güncelledim
-          // 5. YENİ BUTON: Çıkış Yap Butonu
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: _logout,
-            tooltip: 'Çıkış Yap',
-          ),
-          const Padding(
-            padding: EdgeInsets.only(right: 16.0),
-            child: CircleAvatar(
-              backgroundImage: NetworkImage('https://i.pravatar.cc/150?img=12'),
-            ),
-          ),
-        ],
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 1.0,
       ),
-      body: FutureBuilder<List<EventModel>>(
-        future: futureEvents,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            // ... (Hata yönetimi aynı) ...
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text('Bir hata oluştu:\n${snapshot.error}', textAlign: TextAlign.center),
-              ),
+
+      // 🔻 Alt Navigasyon Bar
+      bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
+        currentIndex: _selectedIndex,
+        onTap: (index) {
+          setState(() => _selectedIndex = index);
+          if (index == 4) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const ProfileScreen()),
             );
-          } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-            // ... (ListView aynı) ...
-            final events = snapshot.data!;
-            return ListView.builder(
-              padding: const EdgeInsets.all(16.0),
-              itemCount: events.length,
-              itemBuilder: (BuildContext context, int index) {
-                return EventCard(event: events[index]);
-              },
-            );
-          } else {
-            return const Center(child: Text('Gösterilecek etkinlik bulunamadı.'));
           }
         },
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        // ... (BottomNavigationBar aynı) ...
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline), label: 'Mesajlar'),
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Keşfet'),
           BottomNavigationBarItem(icon: Icon(Icons.favorite_border), label: 'Favoriler'),
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Ana Sayfa'),
-          BottomNavigationBarItem(icon: Icon(Icons.shopping_bag_outlined), label: 'Etkinliklerim'),
-          BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Profil'),
+          BottomNavigationBarItem(icon: Icon(Icons.notifications_none), label: 'Bildirimler'),
+          BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Profilim'),
         ],
-        currentIndex: _selectedIndex,
-        selectedItemColor: Colors.red,
-        unselectedItemColor: Colors.grey,
-        onTap: _onItemTapped,
-        showUnselectedLabels: true,
-        type: BottomNavigationBarType.fixed,
       ),
     );
   }

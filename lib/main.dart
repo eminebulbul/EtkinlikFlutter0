@@ -1,9 +1,9 @@
-// main.dart'ın GÜNCELLENMİŞ hali
-
-import 'package:etkinlik/screens/home_screen.dart';
-
 import 'package:flutter/material.dart';
-// 1. Değişiklik: Artık LoginScreen'i import ediyoruz
+import 'package:shared_preferences/shared_preferences.dart';
+import 'screens/login_screen.dart';
+import 'screens/register_screen.dart';
+import 'screens/home_screen.dart';
+
 void main() {
   runApp(const MyApp());
 }
@@ -11,20 +11,36 @@ void main() {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
+  Future<String?> _loadToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('auth_token');
+  }
+
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'MateVent', // Proje adına güncelledim
-      theme: ThemeData(
-        primarySwatch: Colors.red,
-      ),
-      // 2. Değişiklik: Artık doğrudan HomeScreen'i değil, LoginScreen'i gösteriyoruz.
-    
-      // HomeScreen'e, yoksa LoginScreen'e yönlendirme yapacağız.
+    return FutureBuilder<String?>(
+      future: _loadToken(),
+      builder: (context, snapshot) {
+        // splash/loading state
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const MaterialApp(
+            debugShowCheckedModeBanner: false,
+            home: Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            ),
+          );
+        }
 
-      home: const HomeScreen(), 
+        final loggedIn =
+            snapshot.data != null && snapshot.data!.trim().isNotEmpty;
 
-      debugShowCheckedModeBanner: false,
+        return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            title: 'Etkinlik Flutter',
+            home: RegisterScreen(), // <-- geçici olarak direkt login ekranını aç
+          );
+        
+      },
     );
   }
 }
