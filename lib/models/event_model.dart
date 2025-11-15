@@ -22,13 +22,13 @@ class EventModel {
   });
 
   factory EventModel.fromJson(Map<String, dynamic> json) {
-    int _parseInt(dynamic value) {
+    int parseInt(dynamic value) {
       if (value is int) return value;
       return int.tryParse(value?.toString() ?? '') ?? 0;
     }
 
     return EventModel(
-      id: _parseInt(json['id']),
+      id: parseInt(json['id']),
       title: json['title']?.toString() ?? '',
       imageUrl: json['imageUrl']?.toString() ?? '',
       peopleNeeded: json['peopleNeeded']?.toString() ?? '',
@@ -36,7 +36,7 @@ class EventModel {
       hostImageUrl: json['hostImageUrl']?.toString() ?? '',
       date: DateTime.tryParse(json['date']?.toString() ?? '') ?? DateTime.now(),
       location: json['location']?.toString() ?? '',
-      organizerUserId: _parseInt(json['organizerUserId']),
+      organizerUserId: parseInt(json['organizerUserId']),
     );
   }
 }

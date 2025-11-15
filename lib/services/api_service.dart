@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import '../models/chat_message_model.dart'; // en üst importlara eklemeyi unutma
 import '../models/event_model.dart';
 import '../models/join_request_model.dart';
+import '../models/rating_model.dart';
 
 const String baseUrl = "http://localhost:5221/api";
 
@@ -326,4 +327,28 @@ class ApiService {
     throw Exception(
         "Mesaj gönderilemedi (status ${res.statusCode})");
   }
+    /// BELLİ BİR KULLANICI İÇİN PUANLAMALAR
+  Future<List<RatingModel>> getUserRatings(int userId) async {
+    final url = Uri.parse('$baseUrl/Ratings/user/$userId');
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(response.body);
+      if (decoded is List) {
+        return decoded.map((e) => RatingModel.fromJson(e)).toList();
+      }
+      throw Exception("Beklenmeyen veri formatı (liste değil)");
+    }
+
+    // Eğer backend'de RatingsController henüz yoksa 404 alırsın.
+    // Bu durumda boş liste dönüp sessiz kalalım.
+    if (response.statusCode == 404) {
+      return [];
+    }
+
+    throw Exception(
+      "Puanlamalar alınamadı (status ${response.statusCode})",
+    );
+  }
+
 }

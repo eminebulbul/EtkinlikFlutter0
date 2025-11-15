@@ -7,6 +7,7 @@ import '../widgets/event_card.dart';
 import 'login_screen.dart';
 import 'add_event_screen.dart';
 import 'notifications_screen.dart';
+import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -146,30 +147,17 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildProfilePlaceholder(BuildContext context) {
-    final theme = Theme.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Text(
-          "Profil sayfası için henüz geliştirme yapılmadı.\n\n"
-          "Şu anda odak: etkinlikler, istekler ve DM akışı 😊",
-          style: theme.textTheme.bodyMedium,
-          textAlign: TextAlign.center,
-        ),
-      ),
-    );
-  }
-
+  // ignore: unused_element
   @override
   Widget build(BuildContext context) {
+  
     Widget body;
     if (_currentIndex == 0) {
       body = _buildEventsBody(context);
     } else if (_currentIndex == 1) {
       body = const NotificationsScreen();
     } else {
-      body = _buildProfilePlaceholder(context);
+      body = const ProfileScreen();
     }
 
     return Scaffold(

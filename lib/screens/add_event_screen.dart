@@ -125,10 +125,11 @@ class _AddEventScreenState extends State<AddEventScreen> {
         _error = e.toString().replaceFirst('Exception: ', '');
       });
     } finally {
-      if (!mounted) return;
-      setState(() {
-        _isSubmitting = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
     }
   }
 

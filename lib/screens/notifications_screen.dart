@@ -264,7 +264,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                               eventTitle: r.eventTitle,
                             );
 
-                            if (!mounted) return;
+                            if (!context.mounted) return;
 
                             Navigator.of(context).push(
                               MaterialPageRoute(
@@ -280,7 +280,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                               ),
                             );
                           } catch (e) {
-                            if (!mounted) return;
+                            if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
@@ -350,7 +350,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   },
                   style: OutlinedButton.styleFrom(
                     backgroundColor: _showIncoming
-                        ? theme.colorScheme.primary.withOpacity(0.1)
+                        ? theme.colorScheme.primary.withValues(alpha: 0.1)
                         : null,
                   ),
                   child: const Text("Gelen istekler"),
@@ -366,7 +366,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   },
                   style: OutlinedButton.styleFrom(
                     backgroundColor: !_showIncoming
-                        ? theme.colorScheme.primary.withOpacity(0.1)
+                        ? theme.colorScheme.primary.withValues(alpha: 0.1)
                         : null,
                   ),
                   child: const Text("İsteklerim"),

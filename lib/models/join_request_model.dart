@@ -20,18 +20,18 @@ class JoinRequestModel {
   });
 
   factory JoinRequestModel.fromJson(Map<String, dynamic> json) {
-    int _parseInt(dynamic v) {
+    int parseInt(dynamic v) {
       if (v is int) return v;
       return int.tryParse(v?.toString() ?? '') ?? 0;
     }
 
     return JoinRequestModel(
-      id: _parseInt(json['id']),
-      eventId: _parseInt(json['eventId']),
+      id: parseInt(json['id']),
+      eventId: parseInt(json['eventId']),
       eventTitle: json['eventTitle']?.toString() ?? '',
-      fromUserId: _parseInt(json['fromUserId']),
+      fromUserId: parseInt(json['fromUserId']),
       fromUserName: json['fromUserName']?.toString() ?? '',
-      toUserId: _parseInt(json['toUserId']),
+      toUserId: parseInt(json['toUserId']),
       status: json['status']?.toString() ?? '',
       createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
           DateTime.now(),

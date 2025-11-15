@@ -160,7 +160,8 @@ class _ChatScreenState extends State<ChatScreen> {
                                 ? Alignment.centerRight
                                 : Alignment.centerLeft;
                             final color = fromMe
-                                ? theme.colorScheme.primary.withOpacity(0.9)
+                                ? theme.colorScheme.primary
+                                    .withValues(alpha: 0.9)
                                 : Colors.grey.shade300;
                             final textColor =
                                 fromMe ? Colors.white : Colors.black87;

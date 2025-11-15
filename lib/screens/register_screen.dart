@@ -64,10 +64,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _error = e.toString().replaceFirst('Exception: ', '');
       });
     } finally {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 

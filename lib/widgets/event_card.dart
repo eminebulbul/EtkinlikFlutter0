@@ -33,6 +33,7 @@ class EventCard extends StatelessWidget {
 
   Future<void> _handleJoin(BuildContext context) async {
     final prefs = await SharedPreferences.getInstance();
+    if (!context.mounted) return;
     // user_id int, auth_token da string olarak userId
     final userId = prefs.getInt('user_id') ??
         int.tryParse(prefs.getString('auth_token') ?? '') ??
@@ -69,12 +70,14 @@ class EventCard extends StatelessWidget {
         toUserId: event.organizerUserId,
       );
 
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("Etkinlik sahibine istek gönderildi."),
         ),
       );
     } catch (e) {
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text("İstek gönderilemedi: $e"),
@@ -172,7 +175,7 @@ class EventCard extends StatelessWidget {
                     CircleAvatar(
                       radius: 18,
                       backgroundImage: NetworkImage(event.hostImageUrl),
-                      onBackgroundImageError: (_, __) {},
+                      onBackgroundImageError: (error, stackTrace) {},
                     ),
                     const SizedBox(width: 10),
                     Expanded(
