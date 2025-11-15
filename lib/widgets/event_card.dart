@@ -1,132 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../models/event_model.dart';
+import '../services/api_service.dart';
 
 class EventCard extends StatelessWidget {
   final EventModel event;
   const EventCard({super.key, required this.event});
 
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      elevation: 3,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // üstte etkinlik resmi
-          AspectRatio(
-            aspectRatio: 16 / 9,
-            child: Image.network(
-              event.imageUrl,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stack) {
-                return Container(
-                  color: Colors.grey.shade300,
-                  child: const Center(
-                    child: Icon(Icons.image_not_supported),
-                  ),
-                );
-              },
-            ),
-          ),
-
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // başlık
-                Text(
-                  event.title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-                const SizedBox(height: 8),
-
-                // kaç kişi aranıyor + tarih
-                Row(
-                  children: [
-                    Icon(Icons.group, size: 18, color: Colors.grey.shade700),
-                    const SizedBox(width: 6),
-                    Text(
-                      "${event.peopleNeeded} kişi aranıyor",
-                      style: TextStyle(color: Colors.grey.shade700),
-                    ),
-                    const SizedBox(width: 12),
-                    Icon(Icons.calendar_month,
-                        size: 18, color: Colors.grey.shade700),
-                    const SizedBox(width: 6),
-                    Text(
-                      _formatDate(event.date),
-                      style: TextStyle(color: Colors.grey.shade700),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // konum
-                Row(
-                  children: [
-                    Icon(Icons.place, size: 18, color: Colors.grey.shade700),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        event.location,
-                        style: TextStyle(color: Colors.grey.shade700),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // ev sahibi bilgisi
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 20,
-                      backgroundImage: NetworkImage(event.hostImageUrl),
-                      onBackgroundImageError: (_, _) {},
-                      child: event.hostImageUrl.isEmpty
-                          ? const Icon(Icons.person)
-                          : null,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        event.hostName,
-                        style: const TextStyle(fontWeight: FontWeight.w500),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        // ileride katıl butonu, DM gönder vb.
-                      },
-                      child: const Text("Katıl"),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   String _formatDate(DateTime d) {
-    // örnek: 30 Ekim 18:30
-    final twoDigits = (int n) => n < 10 ? "0$n" : "$n";
-    final hour = twoDigits(d.hour);
-    final min = twoDigits(d.minute);
+    final hour = d.hour.toString().padLeft(2, '0');
+    final min = d.minute.toString().padLeft(2, '0');
 
-    // türkçe ay ismi basit
     const aylar = [
       "Ocak",
       "Şubat",
@@ -144,5 +29,182 @@ class EventCard extends StatelessWidget {
 
     final ay = aylar[d.month - 1];
     return "${d.day} $ay $hour:$min";
+  }
+
+  Future<void> _handleJoin(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+    // user_id int, auth_token da string olarak userId
+    final userId = prefs.getInt('user_id') ??
+        int.tryParse(prefs.getString('auth_token') ?? '') ??
+        0;
+    final userName = prefs.getString('user_name') ?? 'Kullanıcı';
+
+    if (userId == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("İstek göndermek için önce giriş yapmalısın."),
+        ),
+      );
+      return;
+    }
+
+    // 🔒 Kendi etkinliğine katılamazsın
+    if (userId == event.organizerUserId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Kendi açtığın etkinliğe katılamazsın."),
+        ),
+      );
+      return;
+    }
+
+    final api = ApiService();
+
+    try {
+      await api.sendJoinRequest(
+        eventId: event.id,
+        eventTitle: event.title,
+        fromUserId: userId,
+        fromUserName: userName,
+        toUserId: event.organizerUserId,
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Etkinlik sahibine istek gönderildi."),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("İstek gönderilemedi: $e"),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      elevation: 3,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Üstte etkinlik resmi
+          AspectRatio(
+            aspectRatio: 16 / 9,
+            child: Image.network(
+              event.imageUrl,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  color: Colors.grey.shade300,
+                  child: const Center(
+                    child: Icon(Icons.image_not_supported),
+                  ),
+                );
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Başlık
+                Text(
+                  event.title,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Kaç kişi aranıyor + tarih
+                Row(
+                  children: [
+                    Icon(Icons.group, size: 18, color: Colors.grey.shade700),
+                    const SizedBox(width: 6),
+                    Text(
+                      "${event.peopleNeeded} kişi aranıyor",
+                      style: TextStyle(color: Colors.grey.shade700),
+                    ),
+                    const SizedBox(width: 12),
+                    Icon(Icons.schedule,
+                        size: 18, color: Colors.grey.shade700),
+                    const SizedBox(width: 6),
+                    Text(
+                      _formatDate(event.date),
+                      style: TextStyle(color: Colors.grey.shade700),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+
+                // Konum
+                Row(
+                  children: [
+                    Icon(Icons.location_on,
+                        size: 18, color: Colors.grey.shade700),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        event.location,
+                        style: TextStyle(color: Colors.grey.shade700),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                const Divider(),
+
+                // Ev sahibi + Katıl butonu
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 18,
+                      backgroundImage: NetworkImage(event.hostImageUrl),
+                      onBackgroundImageError: (_, __) {},
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            event.hostName,
+                            style: theme.textTheme.bodyMedium
+                                ?.copyWith(fontWeight: FontWeight.w500),
+                          ),
+                          Text(
+                            "Etkinliği oluşturan",
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: () => _handleJoin(context),
+                      child: const Text("Katıl"),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

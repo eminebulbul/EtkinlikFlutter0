@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/home_screen.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
 }
 
@@ -21,7 +23,6 @@ class MyApp extends StatelessWidget {
     return FutureBuilder<String?>(
       future: _loadToken(),
       builder: (context, snapshot) {
-        // splash/loading state
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const MaterialApp(
             debugShowCheckedModeBanner: false,
@@ -32,14 +33,23 @@ class MyApp extends StatelessWidget {
         }
 
         final loggedIn =
-            snapshot.data != null && snapshot.data!.trim().isNotEmpty;
+            (snapshot.data ?? '').trim().isNotEmpty;
 
         return MaterialApp(
-            debugShowCheckedModeBanner: false,
-            title: 'Etkinlik Flutter',
-            home: RegisterScreen(), // <-- geçici olarak direkt login ekranını aç
-          );
-        
+          debugShowCheckedModeBanner: false,
+          title: 'MateVent',
+          theme: ThemeData(
+            colorScheme:
+                ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+            useMaterial3: true,
+          ),
+          home: loggedIn ? const HomeScreen() : const LoginScreen(),
+          routes: {
+            '/login': (_) => const LoginScreen(),
+            '/register': (_) => const RegisterScreen(),
+            '/home': (_) => const HomeScreen(),
+          },
+        );
       },
     );
   }
