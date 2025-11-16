@@ -142,6 +142,15 @@ class _LoginScreenState extends State<LoginScreen> {
                   SizedBox(
                     height: 48,
                     child: ElevatedButton(
+                      style: ButtonStyle(
+                        backgroundColor:
+                            WidgetStateProperty.resolveWith<Color?>((states) {
+                          if (states.contains(WidgetState.hovered)) {
+                            return Colors.green.shade700;
+                          }
+                          return Colors.green.shade200;
+                        }),
+                      ),
                       onPressed: _isLoading ? null : _handleLogin,
                       child: _isLoading
                           ? const SizedBox(

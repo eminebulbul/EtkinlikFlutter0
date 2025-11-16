@@ -4,6 +4,7 @@ import '../models/chat_message_model.dart'; // en üst importlara eklemeyi unutm
 import '../models/event_model.dart';
 import '../models/join_request_model.dart';
 import '../models/rating_model.dart';
+import '../models/conversation_model.dart';
 
 const String baseUrl = "http://localhost:5221/api";
 
@@ -156,8 +157,7 @@ class ApiService {
     throw Exception("Etkinlik oluşturulamadı (status ${response.statusCode})");
   }
 
-  /// KATILIM İSTEĞİ GÖNDERME
-  Future<void> sendJoinRequest({
+  Future<JoinRequestModel> sendJoinRequest({
     required int eventId,
     required String eventTitle,
     required int fromUserId,
@@ -165,24 +165,66 @@ class ApiService {
     required int toUserId,
   }) async {
     final url = Uri.parse('$baseUrl/JoinRequests');
+    final body = {
+      "eventId": eventId,
+      "eventTitle": eventTitle,
+      "fromUserId": fromUserId,
+      "fromUserName": fromUserName,
+      "toUserId": toUserId,
+    };
 
-    final response = await http.post(
+    final res = await http.post(
       url,
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        "eventId": eventId,
-        "eventTitle": eventTitle,
-        "fromUserId": fromUserId,
-        "fromUserName": fromUserName,
-        "toUserId": toUserId,
-      }),
+      body: jsonEncode(body),
     );
 
-    if (response.statusCode == 200 || response.statusCode == 201) {
+    if (res.statusCode == 200 || res.statusCode == 201) {
+      final decoded = jsonDecode(res.body);
+      return JoinRequestModel.fromJson(decoded);
+    }
+
+    throw Exception(
+      "İstek gönderilemedi (status ${res.statusCode})",
+    );
+  }
+
+    Future<JoinRequestModel?> getMyJoinRequestForEvent({
+    required int eventId,
+    required int userId,
+  }) async {
+    final url = Uri.parse(
+      '$baseUrl/JoinRequests/forEventAndUser/$eventId/$userId',
+    );
+
+    final res = await http.get(url);
+
+    if (res.statusCode == 200) {
+      final decoded = jsonDecode(res.body);
+      return JoinRequestModel.fromJson(decoded);
+    }
+
+    if (res.statusCode == 404) {
+      // Hiç istek yok demek
+      return null;
+    }
+
+    throw Exception(
+      "İstek durumu alınamadı (status ${res.statusCode})",
+    );
+  }
+  Future<void> cancelJoinRequest(int requestId) async {
+    final url = Uri.parse('$baseUrl/JoinRequests/$requestId');
+    final res = await http.delete(url);
+
+    if (res.statusCode == 200 || res.statusCode == 204 || res.statusCode == 404) {
+      // 200/204: başarı, 404: zaten yok → sessiz geç
       return;
     }
 
-    throw Exception("İstek gönderilemedi (status ${response.statusCode})");
+    throw Exception(
+      "İstek iptal edilemedi (status ${res.statusCode})",
+    );
   }
 
   /// İLAN SAHİBİ İÇİN GELEN İSTEKLER
@@ -299,7 +341,29 @@ class ApiService {
     throw Exception(
         "Mesajlar alınamadı (status ${res.statusCode})");
   }
+    /// BELİRLİ BİR KULLANICININ TÜM KONUŞMALARI
+  Future<List<ConversationModel>> getUserConversations(int userId) async {
+    final url = Uri.parse('$baseUrl/Conversations/user/$userId');
+    final res = await http.get(url);
 
+    if (res.statusCode == 200) {
+      final decoded = jsonDecode(res.body);
+      if (decoded is List) {
+        return decoded
+            .map((e) => ConversationModel.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+      throw Exception("Beklenmeyen veri formatı (liste değil)");
+    }
+
+    if (res.statusCode == 404) {
+      // hiç konuşması yok gibi davran
+      return [];
+    }
+
+    throw Exception(
+        "Konuşmalar alınamadı (status ${res.statusCode})");
+  }
   /// MESAJ GÖNDER
   Future<void> sendMessage({
     required int conversationId,

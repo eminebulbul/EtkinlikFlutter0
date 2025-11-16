@@ -22,6 +22,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   String? _error;
   int? _currentUserId;
   String? _currentUserName;
+  int? _cancelingRequestId;
 
   bool _showIncoming = true; // true: Gelenler, false: İsteklerim
 
@@ -128,6 +129,35 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
+  Future<void> _withdrawRequest(JoinRequestModel request) async {
+    setState(() {
+      _cancelingRequestId = request.id;
+    });
+
+    try {
+      await _api.cancelJoinRequest(request.id);
+
+      if (!mounted) return;
+
+      setState(() {
+        _myRequests.removeWhere((r) => r.id == request.id);
+        _cancelingRequestId = null;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("İstek geri çekildi.")),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _cancelingRequestId = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("İstek geri çekilemedi: $e")),
+      );
+    }
+  }
+
   Widget _buildIncomingList(BuildContext context) {
     final theme = Theme.of(context);
 
@@ -210,6 +240,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
           String statusText;
           Color statusColor;
+          final isPending = r.status == "Pending" || r.status.isEmpty;
 
           switch (r.status) {
             case "Accepted":
@@ -290,6 +321,23 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           }
                         },
                         child: const Text("Mesaja git"),
+                      ),
+                    )
+                  else if (isPending)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: _cancelingRequestId == r.id
+                            ? null
+                            : () => _withdrawRequest(r),
+                        child: _cancelingRequestId == r.id
+                            ? const SizedBox(
+                                height: 18,
+                                width: 18,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2),
+                              )
+                            : const Text("İsteği geri çek"),
                       ),
                     ),
                 ],

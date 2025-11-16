@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/api_service.dart';
 import '../models/event_model.dart';
+import '../models/join_request_model.dart';
 import '../widgets/event_card.dart';
 import 'login_screen.dart';
 import 'add_event_screen.dart';
@@ -18,7 +19,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final ApiService _api = ApiService();
-  late Future<List<EventModel>> _futureEvents;
+  late Future<_EventsPayload> _futureEvents;
 
   int _currentIndex = 0; // 0: Etkinlikler, 1: Bildirimler, 2: Profil
 
@@ -28,8 +29,34 @@ class _HomeScreenState extends State<HomeScreen> {
     _futureEvents = _loadEvents();
   }
 
-  Future<List<EventModel>> _loadEvents() async {
-    return _api.getEvents();
+  Future<_EventsPayload> _loadEvents() async {
+    final eventsFuture = _api.getEvents();
+    final prefsFuture = SharedPreferences.getInstance();
+
+    final results = await Future.wait([eventsFuture, prefsFuture]);
+    final events = results[0] as List<EventModel>;
+    final prefs = results[1] as SharedPreferences;
+
+    final userId = prefs.getInt('user_id') ??
+        int.tryParse(prefs.getString('auth_token') ?? '') ??
+        0;
+    final userName = prefs.getString('user_name');
+
+    Map<int, JoinRequestModel> myRequests = {};
+    if (userId != 0) {
+      final outgoing = await _api.getAcceptedOutgoingRequests(userId);
+      myRequests = {
+        for (final r in outgoing.where((r) => r.fromUserId == userId))
+          r.eventId: r,
+      };
+    }
+
+    return _EventsPayload(
+      events: events,
+      myRequests: myRequests,
+      currentUserId: userId == 0 ? null : userId,
+      currentUserName: userName,
+    );
   }
 
   Future<void> _refreshEvents() async {
@@ -64,7 +91,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return RefreshIndicator(
       onRefresh: _refreshEvents,
-      child: FutureBuilder<List<EventModel>>(
+      child: FutureBuilder<_EventsPayload>(
         future: _futureEvents,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -116,7 +143,8 @@ class _HomeScreenState extends State<HomeScreen> {
             );
           }
 
-          final events = snapshot.data ?? [];
+          final payload = snapshot.data;
+          final events = payload?.events ?? [];
 
           if (events.isEmpty) {
             return ListView(
@@ -139,7 +167,11 @@ class _HomeScreenState extends State<HomeScreen> {
             itemCount: events.length,
             itemBuilder: (context, index) {
               final event = events[index];
-              return EventCard(event: event);
+              final existingRequest =
+                  payload?.myRequests[event.id];
+              return EventCard(
+                event: event,
+              );
             },
           );
         },
@@ -162,7 +194,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("MateVent"),
+        title: const Text("EtkinlikArkadaşı"),
         actions: [
           IconButton(
             tooltip: "Çıkış yap",
@@ -205,4 +237,18 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+}
+
+class _EventsPayload {
+  final List<EventModel> events;
+  final Map<int, JoinRequestModel> myRequests;
+  final int? currentUserId;
+  final String? currentUserName;
+
+  const _EventsPayload({
+    required this.events,
+    required this.myRequests,
+    required this.currentUserId,
+    required this.currentUserName,
+  });
 }

@@ -1,33 +1,31 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-import '../services/api_service.dart';
 import '../models/event_model.dart';
 import '../models/rating_model.dart';
-import 'profile_edit_screen.dart';
-import '../models/join_request_model.dart';
-import 'messages_screen.dart';
+import '../services/api_service.dart';
 
-class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+class UserProfileScreen extends StatefulWidget {
+  final int userId;
+  final String userName;
+
+  const UserProfileScreen({
+    super.key,
+    required this.userId,
+    required this.userName,
+  });
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  State<UserProfileScreen> createState() => _UserProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _UserProfileScreenState extends State<UserProfileScreen> {
   final ApiService _api = ApiService();
 
   bool _isLoading = true;
   String? _error;
 
-  String _userName = "Kullanıcı";
-  String? _profileImageUrl;
-  String? _bio;
-
   List<EventModel> _createdEvents = [];
   List<EventModel> _joinedEvents = [];
-
   List<RatingModel> _ratings = [];
   double _averageRating = 0.0;
 
@@ -44,32 +42,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-
-      final id =
-          prefs.getInt('user_id') ??
-              int.tryParse(prefs.getString('auth_token') ?? '') ??
-              0;
-
-      if (id == 0) {
-        setState(() {
-          _error = "Profil bilgileri için önce giriş yapmalısın.";
-          _isLoading = false;
-        });
-        return;
-      }
-
-      final name = prefs.getString('user_name') ?? "Kullanıcı";
-      final bio = prefs.getString('profile_bio');
-      final avatar = prefs.getString('profile_image_url');
-
-      // API çağrılarını paralel alalım
+      // Tüm etkinlikleri ve bu kullanıcının gönderdiği istekleri al
       final eventsFuture = _api.getEvents();
-      final myRequestsFuture = _api.getAcceptedOutgoingRequests(id);
-      final ratingsFuture = _api.getUserRatings(id);
+      final outgoingFuture =
+          _api.getAcceptedOutgoingRequests(widget.userId);
+      final ratingsFuture = _api.getUserRatings(widget.userId);
 
-      final List<EventModel> allEvents = await eventsFuture;
-      final List<JoinRequestModel> myRequests = await myRequestsFuture;
+      final allEvents = await eventsFuture;
+      final outgoing = await outgoingFuture;
       List<RatingModel> ratings = [];
       try {
         ratings = await ratingsFuture;
@@ -77,41 +57,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ratings = [];
       }
 
-      // Açtığı etkinlikler
       final created = allEvents
-          .where((e) => e.organizerUserId == id)
+          .where((e) => e.organizerUserId == widget.userId)
           .toList();
 
-      // Katıldığı etkinlikler: Accepted join request'ler
-      final acceptedRequests = myRequests
-          .where((r) => r.status == "Accepted")
-          .toList();
+      final acceptedReqs =
+          outgoing.where((r) => r.status == "Accepted").toList();
 
       final Map<int, EventModel> eventById = {
         for (final e in allEvents) e.id: e,
       };
 
       final joined = <EventModel>[];
-      for (final r in acceptedRequests) {
+      for (final r in acceptedReqs) {
         final ev = eventById[r.eventId];
         if (ev != null) {
           joined.add(ev);
         }
       }
 
-      // Rating ortalaması
       double avg = 0.0;
       if (ratings.isNotEmpty) {
-        avg = ratings.map((r) => r.score).reduce((a, b) => a + b) /
+        avg = ratings
+                .map((r) => r.score)
+                .reduce((a, b) => a + b) /
             ratings.length;
       }
 
       if (!mounted) return;
 
       setState(() {
-        _userName = name;
-        _bio = bio;
-        _profileImageUrl = avatar;
         _createdEvents = created;
         _joinedEvents = joined;
         _ratings = ratings;
@@ -127,18 +102,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  void _openEditProfile() async {
-    final updated = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => const ProfileEditScreen(),
-      ),
-    );
-
-    if (updated == true) {
-      _loadProfile();
-    }
-  }
-
   Widget _buildHeader(BuildContext context) {
     final theme = Theme.of(context);
 
@@ -147,20 +110,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
       children: [
         CircleAvatar(
           radius: 40,
-          backgroundImage: (_profileImageUrl != null &&
-                  _profileImageUrl!.trim().isNotEmpty)
-              ? NetworkImage(_profileImageUrl!)
-              : null,
-          child: (_profileImageUrl == null ||
-                  _profileImageUrl!.trim().isEmpty)
-              ? Text(
-                  _userName.isNotEmpty ? _userName[0].toUpperCase() : "?",
-                  style: const TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                  ),
-                )
-              : null,
+          child: Text(
+            widget.userName.isNotEmpty
+                ? widget.userName[0].toUpperCase()
+                : "?",
+            style: const TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ),
         const SizedBox(width: 16),
         Expanded(
@@ -168,29 +126,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                _userName,
+                widget.userName,
                 style: theme.textTheme.titleLarge
                     ?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 4),
-              if (_bio != null && _bio!.trim().isNotEmpty)
-                Text(
-                  _bio!,
-                  style: theme.textTheme.bodyMedium,
-                )
-              else
-                Text(
-                  "Kendin hakkında kısa bir bio ekleyebilirsin.",
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: Colors.grey.shade600),
-                ),
+              Text(
+                "Profil görüntüleme",
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: Colors.grey.shade600),
+              ),
             ],
           ),
-        ),
-        IconButton(
-          tooltip: "Profili düzenle",
-          onPressed: _openEditProfile,
-          icon: const Icon(Icons.edit),
         ),
       ],
     );
@@ -198,9 +145,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildStatsCard(BuildContext context) {
     final theme = Theme.of(context);
-    final createdCount = _createdEvents.length;
-    final joinedCount = _joinedEvents.length;
-    final ratingCount = _ratings.length;
 
     return Card(
       margin: const EdgeInsets.only(top: 16, bottom: 12),
@@ -212,20 +156,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _buildStatItem(
               theme,
               label: "Açtığı etkinlik",
-              value: createdCount.toString(),
+              value: _createdEvents.length.toString(),
             ),
             _buildStatItem(
               theme,
               label: "Katıldığı etkinlik",
-              value: joinedCount.toString(),
+              value: _joinedEvents.length.toString(),
             ),
             _buildStatItem(
               theme,
               label: "Puan",
-              value: ratingCount == 0
+              value: _ratings.isEmpty
                   ? "-"
                   : _averageRating.toStringAsFixed(1),
-              extra: ratingCount == 0 ? null : "($ratingCount)",
+              extra: _ratings.isEmpty ? null : "(${_ratings.length})",
             ),
           ],
         ),
@@ -296,7 +240,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           contentPadding: EdgeInsets.zero,
           leading: CircleAvatar(
             backgroundImage: NetworkImage(e.imageUrl),
-            onBackgroundImageError: (error, stackTrace) {},
+            onBackgroundImageError: (_, _) {},
           ),
           title: Text(e.title),
           subtitle: Text(e.location),
@@ -358,78 +302,66 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
+    final theme = Theme.of(context);
 
-    if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.error_outline, size: 40),
-              const SizedBox(height: 12),
-              Text(
-                _error!,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: _loadProfile,
-                icon: const Icon(Icons.refresh),
-                label: const Text("Tekrar dene"),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: _loadProfile,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeader(context),
-            _buildStatsCard(context),
-            Card(
-              margin: const EdgeInsets.only(bottom: 12),
-              child: ListTile(
-                leading: const Icon(Icons.chat_bubble_outline),
-                title: const Text("Mesajlarım"),
-                subtitle: const Text("Tüm konuşmalarını burada görebilirsin."),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const MessagesScreen(),
-                    ),
-                  );
-                },
-              ),
-            ),
-
-            _buildSectionTitle("Açtığın etkinlikler"),
-            _buildEventList(
-              _createdEvents,
-              "Henüz bir etkinlik açmamışsın.",
-            ),
-
-            _buildSectionTitle("Katıldığın etkinlikler"),
-            _buildEventList(
-              _joinedEvents,
-              "Henüz katıldığın etkinlik yok.",
-            ),
-
-            _buildSectionTitle("Senin hakkındaki puanlamalar"),
-            _buildRatingsList(),
-          ],
-        ),
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.userName),
       ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.error_outline, size: 40),
+                        const SizedBox(height: 12),
+                        Text(
+                          _error!,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: _loadProfile,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text("Tekrar dene"),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _loadProfile,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildHeader(context),
+                        _buildStatsCard(context),
+
+                        _buildSectionTitle("Açtığı etkinlikler"),
+                        _buildEventList(
+                          _createdEvents,
+                          "Bu kullanıcının açtığı etkinlik bulunmuyor.",
+                        ),
+
+                        _buildSectionTitle("Katıldığı etkinlikler"),
+                        _buildEventList(
+                          _joinedEvents,
+                          "Bu kullanıcının katıldığı etkinlik bulunmuyor.",
+                        ),
+
+                        _buildSectionTitle("Bu kullanıcı hakkındaki puanlamalar"),
+                        _buildRatingsList(),
+                      ],
+                    ),
+                  ),
+                ),
     );
   }
 }
